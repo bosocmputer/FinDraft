@@ -36,17 +36,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # CORS — ปรับ origins ก่อน go live
-_frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-_allowed_origins = [
-    "http://localhost:3000",
-    _frontend_url,
-]
-# Allow all Vercel preview deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app$",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
