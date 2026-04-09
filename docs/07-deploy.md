@@ -1,22 +1,77 @@
 # Deploy Plan
 
-_Blueprint v3.2 | [← Index](README.md)_
+_Blueprint v3.2 | Updated 2026-04-09 | [← Index](README.md)_
+
+---
+
+## 🟢 สถานะ Deploy ปัจจุบัน (2026-04-09)
+
+| Service | URL | Status |
+|---------|-----|--------|
+| Backend (Railway) | https://bountiful-freedom-production.up.railway.app | ✅ Live |
+| Frontend (Vercel) | https://fin-draft-rho.vercel.app | ✅ Live |
+| Database (Supabase) | ztzytgieqmuswrpneliz.supabase.co | ✅ Live |
+| Redis (Railway) | redis.railway.internal:6379 | ✅ Live |
+
+### ✅ ทำเสร็จแล้ว
+- Backend deploy บน Railway (buildpack Python 3.11)
+- Frontend deploy บน Vercel (Next.js 16)
+- Database migrations รันครบ (13 tables)
+- RLS disabled (backend handle access control แทน)
+- Unique constraint บน account_mappings(project_id, account_code)
+- Redis service deploy บน Railway
+- CORS allow *.vercel.app ทุก subdomain
+- Login / Register / Dashboard ทำงานได้
+- Upload TB (Excel) ทำงานได้
+- AI Mapping ทำงานได้ (OpenRouter + llama-3.3-70b)
+
+### ⚠️ Known Issues / ยังต้องแก้
+- Mapping page: ยังมี bug บางจุดที่ยังทดสอบไม่ครบ
+- Editor page: draft/finalize ยังไม่ได้ทดสอบ end-to-end
+- Export page: Excel/PDF export ยังไม่ได้ทดสอบ
+- Register flow: user ที่สมัครก่อน fix ต้อง insert user_organizations ด้วย SQL manual
+- CORS: ตอนนี้ใช้ allow_origins=["*"] ชั่วคราว — ต้องแก้ให้ specific ก่อน go live
+- Supabase email confirmation ถูกปิดไว้ (ควรเปิดใน production)
+- Celery worker ยังไม่ได้ deploy (mapping/draft ทำงาน sync แทน)
+- PDF export ต้องการ weasyprint ซึ่งต้องใช้ Dockerfile (ยังไม่ได้เปิด)
+
+### 🔑 Environment Variables (Railway Backend)
+```env
+SUPABASE_URL=https://ztzytgieqmuswrpneliz.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...service_role...
+DATABASE_URL=postgresql://postgres:%40findraft2026@db.ztzytgieqmuswrpneliz.supabase.co:5432/postgres
+AI_PROVIDER=openrouter
+AI_MODEL=meta-llama/llama-3.3-70b-instruct
+OPENROUTER_API_KEY=sk-or-v1-...
+AI_KEY_ENCRYPTION_SECRET=hVAqbhiGpR2iF5VrUck3pJpXrht8afpnDavv1yoU4Ss=
+FRONTEND_URL=https://fin-draft-rho.vercel.app
+SECRET_KEY=findraft-prod-secret-2026
+REDIS_URL=redis://default:aqVchHKIE...@redis.railway.internal:6379/0
+```
+
+### 🔑 Environment Variables (Vercel Frontend)
+```env
+NEXT_PUBLIC_API_URL=https://bountiful-freedom-production.up.railway.app
+NEXT_PUBLIC_SUPABASE_URL=https://ztzytgieqmuswrpneliz.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...anon...
+```
 
 ---
 
 ## Architecture Overview
 
 ```
-GitHub
+GitHub (bosocmputer/FinDraft)
   ├── push frontend/ ──→ Vercel       (auto deploy)
   └── push backend/  ──→ Railway      (auto deploy)
 
 Users
-  └── findraft.app (Vercel)
-        └── API calls ──→ api.findraft.app (Railway)
-                              ├── PostgreSQL   (Supabase — RLS enabled)
-                              ├── File Storage (Supabase — private, signed URL)
-                              └── Claude API   (Anthropic claude-sonnet-4-6)
+  └── fin-draft-rho.vercel.app (Vercel)
+        └── API calls ──→ bountiful-freedom-production.up.railway.app (Railway)
+                              ├── PostgreSQL   (Supabase — RLS disabled, backend handles auth)
+                              ├── File Storage (Supabase — tb-files, exports buckets)
+                              ├── Redis        (Railway — Celery broker)
+                              └── OpenRouter   (AI — llama-3.3-70b default)
 ```
 
 ## Services และค่าใช้จ่าย
