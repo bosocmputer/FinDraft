@@ -39,7 +39,7 @@ export default function MappingPage() {
   const loadMappings = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await api.get(`/projects/${projectId}/mappings`, authHeader(user.token));
+      const data = await api.get(`/projects/${projectId}/mapping`, authHeader(user.token));
       setMappings(data);
     } catch {
       toast.error("โหลด mapping ไม่สำเร็จ");
@@ -54,7 +54,7 @@ export default function MappingPage() {
     if (!user) return;
     setRunningAI(true);
     try {
-      await api.post(`/projects/${projectId}/mappings/run`, {}, authHeader(user.token));
+      await api.post(`/projects/${projectId}/mapping/run`, {}, authHeader(user.token));
       toast.success("AI Mapping สำเร็จ");
       await loadMappings();
     } catch (err: unknown) {
@@ -68,7 +68,7 @@ export default function MappingPage() {
     if (!user) return;
     try {
       await api.put(
-        `/projects/${projectId}/mappings/${mappingId}`,
+        `/projects/${projectId}/mapping/${mappingId}`,
         { category },
         authHeader(user.token)
       );
@@ -82,7 +82,7 @@ export default function MappingPage() {
     if (!user) return;
     setConfirming(true);
     try {
-      await api.post(`/projects/${projectId}/mappings/confirm`, {}, authHeader(user.token));
+      await api.post(`/projects/${projectId}/mapping/confirm`, {}, authHeader(user.token));
       toast.success("ยืนยัน mapping ทั้งหมดสำเร็จ");
       router.push(`/projects/${projectId}/editor`);
     } catch (err: unknown) {
