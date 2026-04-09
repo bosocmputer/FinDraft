@@ -34,20 +34,23 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const loadOrgs = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.get("/organizations", authHeader(user.token));
       setOrgs(data);
       // Auto-select first org if none selected
-      if (!org && data.length > 0) {
-        setOrg({ org_id: data[0].id, org_name: data[0].name, role: "admin" });
+      if (data.length > 0) {
+        setOrg({ org_id: data[0].id, org_name: data[0].name, role: data[0].role || "admin" });
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "โหลดข้อมูลองค์กรไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
-  }, [user, org, setOrg]);
+  }, [user, setOrg]);
 
   const loadProjects = useCallback(async () => {
     if (!user || !org) return;
