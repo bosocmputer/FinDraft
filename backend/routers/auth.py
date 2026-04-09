@@ -1,18 +1,18 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from database import supabase
 
 router = APIRouter()
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     name: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 

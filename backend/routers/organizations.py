@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Literal
 from database import supabase
 from dependencies import get_current_user, require_role
@@ -14,7 +14,7 @@ class CreateOrgRequest(BaseModel):
 
 
 class InviteRequest(BaseModel):
-    email: EmailStr
+    email: str
     role: Literal["admin", "auditor", "viewer"]
 
 

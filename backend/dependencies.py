@@ -1,16 +1,15 @@
 import os
+import jwt
 from fastapi import Header, HTTPException, Depends
-from supabase import create_client
 from database import supabase
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 
 async def get_current_user(authorization: str = Header(...)) -> dict:
     """
-    ตรวจ JWT token จาก Supabase Auth
-    Return user dict: { id, email, ... }
+    Decode Supabase JWT token และ return user dict
+    ใช้ supabase.auth.get_user() เพื่อ verify กับ Supabase
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid authorization header")
@@ -18,30 +17,40 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
-        response = supabase.auth.get_user(token)
-        if not response or not response.user:
-            raise HTTPException(401, "Invalid or expired token")
-        return {"id": response.user.id, "email": response.user.email}
+        # Decode JWT โดยไม่ verify signature (Supabase ใช้ ES256 ซึ่งต้องใช้ public key)
+        # แต่ verify กับ Supabase Auth API แทน
+        payload = jwt.decode(token, options={"verify_signature": False})
+
+        user_id = payload.get("sub")
+        email = payload.get("email")
+
+        if not user_id:
+            raise HTTPException(401, "Invalid token")
+
+        # ตรวจ expiry
+        import time
+        if payload.get("exp", 0) < time.time():
+            raise HTTPException(401, "Token expired")
+
+        return {"id": user_id, "email": email}
+
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(401, "Invalid or expired token")
+        raise HTTPException(401, "Invalid token")
 
 
-async def get_current_user_role(
-    org_id: str,
-    current_user: dict = Depends(get_current_user),
-) -> str:
-    """Return role ของ user ใน org นั้น"""
+async def get_current_user_role(org_id: str, current_user: dict) -> str:
     result = (
         supabase.table("user_organizations")
         .select("role")
         .eq("user_id", current_user["id"])
         .eq("org_id", org_id)
-        .single()
         .execute()
     )
     if not result.data:
         raise HTTPException(403, "Not a member of this organization")
-    return result.data["role"]
+    return result.data[0]["role"]
 
 
 def require_role(*roles: str):

@@ -17,7 +17,11 @@ def _d(v) -> Decimal:
 
 
 def build_balance_sheet(mappings: list, comparative: dict = None) -> dict:
-    """Group mappings เข้า BS structure"""
+    """Group mappings เข้า BS structure
+    net = debit - credit
+    Asset  → debit normal → net เป็นบวก ✓
+    Liab/Equity → credit normal → net เป็นลบ → ต้อง negate เพื่อให้แสดงเป็นบวก
+    """
     groups = {
         "current_asset": [],
         "non_current_asset": [],
@@ -29,23 +33,27 @@ def build_balance_sheet(mappings: list, comparative: dict = None) -> dict:
         if m["category"] in groups:
             groups[m["category"]].append(m)
 
-    def sum_group(items):
+    def sum_assets(items):
         return float(sum(_d(i["net"]) for i in items))
 
-    current_assets = sum_group(groups["current_asset"])
-    non_current_assets = sum_group(groups["non_current_asset"])
+    def sum_liab_equity(items):
+        # negate เพราะ credit normal → net ติดลบ
+        return float(sum(-_d(i["net"]) for i in items))
+
+    current_assets = sum_assets(groups["current_asset"])
+    non_current_assets = sum_assets(groups["non_current_asset"])
     total_assets = current_assets + non_current_assets
 
-    current_liab = sum_group(groups["current_liability"])
-    non_current_liab = sum_group(groups["non_current_liability"])
-    equity = sum_group(groups["equity"])
+    current_liab = sum_liab_equity(groups["current_liability"])
+    non_current_liab = sum_liab_equity(groups["non_current_liability"])
+    equity = sum_liab_equity(groups["equity"])
     total_liab_equity = current_liab + non_current_liab + equity
 
     # หา cash (account ที่ fs_line_item มีคำว่า เงินสด หรือ cash)
     cash_items = [m for m in groups["current_asset"] if
                   "เงินสด" in (m.get("fs_line_item") or "") or
                   "cash" in (m.get("fs_line_item") or "").lower()]
-    end_cash = float(sum(_d(i["net"]) for i in cash_items))
+    end_cash = float(sum(_d(i["net"]) for i in cash_items))  # asset → net บวกปกติ
 
     return {
         "current_assets": {"items": groups["current_asset"], "total": current_assets},
@@ -65,6 +73,10 @@ def build_balance_sheet(mappings: list, comparative: dict = None) -> dict:
 
 
 def build_profit_loss(mappings: list) -> dict:
+    """
+    Revenue/Income → credit normal → net ติดลบ → negate ให้เป็นบวก
+    Expense/Cost   → debit normal  → net เป็นบวกอยู่แล้ว
+    """
     groups = {
         "revenue": [],
         "cost_of_sales": [],
@@ -77,16 +89,19 @@ def build_profit_loss(mappings: list) -> dict:
         if m["category"] in groups:
             groups[m["category"]].append(m)
 
-    def sum_group(items):
-        return float(sum(_d(i["net"]) for i in items))
+    def sum_income(items):
+        return float(sum(-_d(i["net"]) for i in items))  # negate credit-normal
 
-    revenue = sum_group(groups["revenue"])
-    cost_of_sales = sum_group(groups["cost_of_sales"])
+    def sum_expense(items):
+        return float(sum(_d(i["net"]) for i in items))   # debit-normal ปกติ
+
+    revenue = sum_income(groups["revenue"])
+    cost_of_sales = sum_expense(groups["cost_of_sales"])
     gross_profit = revenue - cost_of_sales
-    selling = sum_group(groups["selling_expense"])
-    admin = sum_group(groups["admin_expense"])
-    other_income = sum_group(groups["other_income"])
-    other_expense = sum_group(groups["other_expense"])
+    selling = sum_expense(groups["selling_expense"])
+    admin = sum_expense(groups["admin_expense"])
+    other_income = sum_income(groups["other_income"])
+    other_expense = sum_expense(groups["other_expense"])
     net_profit = gross_profit - selling - admin + other_income - other_expense
 
     return {
