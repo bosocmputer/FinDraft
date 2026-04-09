@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthGuard } from "@/components/auth-guard";
@@ -32,45 +32,46 @@ export default function DashboardPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const orgLoaded = useRef(false);
+  const projectsOrgId = useRef<string | null>(null);
 
-  const loadOrgs = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const data = await api.get("/organizations", authHeader(user.token));
-      setOrgs(data);
-      // Auto-select first org if none selected
-      if (data.length > 0) {
-        setOrg({ org_id: data[0].id, org_name: data[0].name, role: data[0].role || "admin" });
-      }
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "โหลดข้อมูลองค์กรไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
+  // Load orgs — run only once when user is available
+  useEffect(() => {
+    if (!user || orgLoaded.current) return;
+    orgLoaded.current = true;
+
+    api.get("/organizations", authHeader(user.token))
+      .then((data) => {
+        setOrgs(data);
+        if (data.length > 0) {
+          setOrg({ org_id: data[0].id, org_name: data[0].name, role: data[0].role || "admin" });
+        }
+      })
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "โหลดข้อมูลองค์กรไม่สำเร็จ");
+      })
+      .finally(() => setLoading(false));
   }, [user, setOrg]);
 
-  const loadProjects = useCallback(async () => {
+  // Load projects — run only when org changes to a new org_id
+  useEffect(() => {
     if (!user || !org) return;
-    setLoading(true);
-    try {
-      const data = await api.get(`/projects?org_id=${org.org_id}`, authHeader(user.token));
-      setProjects(data);
-    } catch {
-      toast.error("โหลดโปรเจกต์ไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
-  }, [user, org]);
+    if (projectsOrgId.current === org.org_id) return;
+    projectsOrgId.current = org.org_id;
 
-  useEffect(() => { loadOrgs(); }, [loadOrgs]);
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+    setLoading(true);
+    api.get(`/projects?org_id=${org.org_id}`, authHeader(user.token))
+      .then((data) => setProjects(data))
+      .catch(() => toast.error("โหลดโปรเจกต์ไม่สำเร็จ"))
+      .finally(() => setLoading(false));
+  }, [user, org]);
 
   function handleOrgChange(orgId: string) {
     const selected = orgs.find((o) => o.id === orgId);
-    if (selected) setOrg({ org_id: selected.id, org_name: selected.name, role: "admin" });
+    if (selected) {
+      projectsOrgId.current = null; // reset so projects reload
+      setOrg({ org_id: selected.id, org_name: selected.name, role: "admin" });
+    }
   }
 
   function getNextStep(project: Project) {
@@ -88,7 +89,6 @@ export default function DashboardPage() {
     <AuthGuard>
       <Navbar />
       <div className="max-w-5xl mx-auto px-6 py-8">
-        {/* Org Switcher */}
         {orgs.length > 0 && (
           <div className="mb-6 flex items-center gap-3">
             <label className="text-sm text-gray-500">องค์กร:</label>
@@ -106,7 +106,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">โปรเจกต์ทั้งหมด</h1>
           <Link
@@ -117,7 +116,6 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Project List */}
         {loading ? (
           <div className="text-center py-16 text-gray-400">กำลังโหลด...</div>
         ) : projects.length === 0 ? (
@@ -133,10 +131,7 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {projects.map((project) => (
-              <div
-                key={project.id}
-                className="border rounded-xl p-5 bg-white hover:shadow-sm transition"
-              >
+              <div key={project.id} className="border rounded-xl p-5 bg-white hover:shadow-sm transition">
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="font-semibold text-gray-900">{project.company_name}</h2>
@@ -145,32 +140,21 @@ export default function DashboardPage() {
                       {project.comparative_year && ` • เปรียบเทียบ ${project.comparative_year}`}
                     </p>
                   </div>
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[project.status] || "bg-gray-100 text-gray-600"}`}
-                  >
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[project.status] || "bg-gray-100 text-gray-600"}`}>
                     {STATUS_LABEL[project.status] || project.status}
                   </span>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push(getNextStep(project))}
-                    className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition"
-                  >
+                  <button type="button" onClick={() => router.push(getNextStep(project))}
+                    className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition">
                     ดำเนินการต่อ
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/projects/${project.id}/editor`)}
-                    className="text-sm border px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
-                  >
+                  <button type="button" onClick={() => router.push(`/projects/${project.id}/editor`)}
+                    className="text-sm border px-3 py-1.5 rounded-lg hover:bg-gray-50 transition">
                     ดูงบการเงิน
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/projects/${project.id}/export`)}
-                    className="text-sm border px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
-                  >
+                  <button type="button" onClick={() => router.push(`/projects/${project.id}/export`)}
+                    className="text-sm border px-3 py-1.5 rounded-lg hover:bg-gray-50 transition">
                     Export
                   </button>
                 </div>
