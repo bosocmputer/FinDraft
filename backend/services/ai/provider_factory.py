@@ -22,6 +22,13 @@ async def get_provider(org_id: str) -> BaseAIProvider:
     config = await get_org_ai_config(org_id)
 
     if not config:
+        # System default — ดึงจาก env (ตอนนี้ใช้ OpenRouter)
+        provider_env = os.getenv("AI_PROVIDER", "openrouter")
+        if provider_env == "openrouter":
+            return OpenRouterProvider(
+                api_key=os.environ["OPENROUTER_API_KEY"],
+                model=os.getenv("AI_MODEL", "meta-llama/llama-3.3-70b-instruct"),
+            )
         return AnthropicProvider(
             api_key=os.environ["ANTHROPIC_API_KEY"],
             model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),

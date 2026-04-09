@@ -50,8 +50,24 @@ def fallback_unreviewed(batch: List[TBRow]) -> List[MappingResult]:
 
 
 async def get_cached_mappings(org_id: str, account_codes: List[str]) -> dict:
-    # TODO: query account_mappings WHERE org_id = ? AND account_code IN (?) AND is_confirmed = true
-    return {}
+    from database import supabase
+    result = (
+        supabase.table("account_mappings")
+        .select("account_code, category, fs_line_item, confidence")
+        .eq("org_id", org_id)
+        .eq("is_confirmed", True)
+        .in_("account_code", account_codes)
+        .execute()
+    )
+    cache = {}
+    for row in (result.data or []):
+        cache[row["account_code"]] = MappingResult(
+            account_code=row["account_code"],
+            category=row["category"],
+            fs_line_item=row["fs_line_item"] or row["account_code"],
+            confidence=float(row["confidence"] or 1.0),
+        )
+    return cache
 
 
 async def call_ai_mapper(batch: List[TBRow], org_id: str) -> str:
