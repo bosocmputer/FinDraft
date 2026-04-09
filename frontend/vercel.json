@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.findraft.app/:path*"
+      "destination": "https://bountiful-freedom-production.up.railway.app/:path*"
     }
   ]
 }

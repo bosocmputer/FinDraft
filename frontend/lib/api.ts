@@ -15,12 +15,26 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
+async function apiFetchRaw(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${API_URL}${path}`, { ...options });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || "API error");
+  }
+  return res;
+}
+
 export const api = {
-  get: (path: string, headers?: HeadersInit) => apiFetch(path, { method: "GET", headers }),
+  get: (path: string, headers?: HeadersInit) =>
+    apiFetch(path, { method: "GET", headers }),
   post: (path: string, body?: unknown, headers?: HeadersInit) =>
     apiFetch(path, { method: "POST", body: JSON.stringify(body), headers }),
   put: (path: string, body?: unknown, headers?: HeadersInit) =>
     apiFetch(path, { method: "PUT", body: JSON.stringify(body), headers }),
   delete: (path: string, headers?: HeadersInit) =>
     apiFetch(path, { method: "DELETE", headers }),
+  postForm: (path: string, form: FormData, headers?: HeadersInit) =>
+    apiFetchRaw(path, { method: "POST", body: form, headers }).then((r) => r.json()),
+  getRaw: (path: string, headers?: HeadersInit) =>
+    apiFetchRaw(path, { method: "GET", headers }),
 };
