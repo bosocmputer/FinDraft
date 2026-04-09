@@ -1,4 +1,8 @@
-from weasyprint import HTML, CSS
+try:
+    from weasyprint import HTML, CSS
+    WEASYPRINT_AVAILABLE = True
+except ImportError:
+    WEASYPRINT_AVAILABLE = False
 
 DRAFT_CSS = """
     body::after {
@@ -22,6 +26,8 @@ BASE_CSS = """
 
 
 def export_to_pdf(html_content: str, is_draft: bool = True) -> bytes:
+    if not WEASYPRINT_AVAILABLE:
+        raise RuntimeError("PDF export requires weasyprint — deploy with Dockerfile")
     extra_css = DRAFT_CSS if is_draft else ""
     return HTML(string=html_content).write_pdf(
         stylesheets=[CSS(string=BASE_CSS + extra_css)]
