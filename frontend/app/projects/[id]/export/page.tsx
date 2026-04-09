@@ -19,7 +19,8 @@ export default function ExportPage() {
   const loadHistory = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await api.get(`/projects/${projectId}/exports`, authHeader(user.token));
+      // Backend: GET /projects/{id}/export/history
+      const data = await api.get(`/projects/${projectId}/export/history`, authHeader(user.token));
       setHistory(data);
     } catch {
       // no history yet
@@ -33,6 +34,7 @@ export default function ExportPage() {
     const key = `${type}-${isDraft}`;
     setExporting(key);
     try {
+      // Backend: GET /projects/{id}/export/excel or /export/pdf?is_draft=true
       const res = await api.getRaw(
         `/projects/${projectId}/export/${type}?is_draft=${isDraft}`,
         authHeader(user.token)
@@ -59,58 +61,38 @@ export default function ExportPage() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Export งบการเงิน</h1>
 
-        {/* Export Options */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* Excel */}
           <div className="border rounded-xl p-5 bg-white">
             <h2 className="font-semibold text-gray-900 mb-1">Excel (.xlsx)</h2>
-            <p className="text-sm text-gray-500 mb-4">งบครบ 4 แผ่น พร้อมสูตรและ formatting</p>
+            <p className="text-sm text-gray-500 mb-4">งบครบ 4 แผ่น พร้อม formatting</p>
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => handleExport("excel", true)}
-                disabled={!!exporting}
-                className="border border-blue-600 text-blue-600 rounded-lg py-2 text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition"
-              >
+              <button type="button" onClick={() => handleExport("excel", true)} disabled={!!exporting}
+                className="border border-blue-600 text-blue-600 rounded-lg py-2 text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition">
                 {exporting === "excel-true" ? "กำลัง export..." : "Draft (มีลายน้ำ)"}
               </button>
-              <button
-                type="button"
-                onClick={() => handleExport("excel", false)}
-                disabled={!!exporting}
-                className="bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
-              >
+              <button type="button" onClick={() => handleExport("excel", false)} disabled={!!exporting}
+                className="bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition">
                 {exporting === "excel-false" ? "กำลัง export..." : "Final (ไม่มีลายน้ำ)"}
               </button>
             </div>
           </div>
 
-          {/* PDF */}
           <div className="border rounded-xl p-5 bg-white">
             <h2 className="font-semibold text-gray-900 mb-1">PDF</h2>
-            <p className="text-sm text-gray-500 mb-4">พร้อมส่งลูกค้าหรือใช้ยื่นสรรพากร</p>
+            <p className="text-sm text-gray-500 mb-4">พร้อมส่งลูกค้าหรือยื่นสรรพากร</p>
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => handleExport("pdf", true)}
-                disabled={!!exporting}
-                className="border border-gray-600 text-gray-600 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition"
-              >
+              <button type="button" onClick={() => handleExport("pdf", true)} disabled={!!exporting}
+                className="border border-gray-600 text-gray-600 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition">
                 {exporting === "pdf-true" ? "กำลัง export..." : "Draft PDF (มีลายน้ำ)"}
               </button>
-              <button
-                type="button"
-                onClick={() => handleExport("pdf", false)}
-                disabled={!!exporting}
-                className="bg-gray-800 text-white rounded-lg py-2 text-sm font-medium hover:bg-gray-900 disabled:opacity-50 transition"
-              >
+              <button type="button" onClick={() => handleExport("pdf", false)} disabled={!!exporting}
+                className="bg-gray-800 text-white rounded-lg py-2 text-sm font-medium hover:bg-gray-900 disabled:opacity-50 transition">
                 {exporting === "pdf-false" ? "กำลัง export..." : "Final PDF"}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Export History */}
         {history.length > 0 && (
           <div>
             <h2 className="font-semibold text-gray-900 mb-3">ประวัติการ Export</h2>
@@ -132,9 +114,7 @@ export default function ExportPage() {
                           {h.is_draft ? "Draft" : "Final"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {new Date(h.created_at).toLocaleString("th-TH")}
-                      </td>
+                      <td className="px-4 py-3 text-gray-500">{new Date(h.created_at).toLocaleString("th-TH")}</td>
                     </tr>
                   ))}
                 </tbody>

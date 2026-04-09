@@ -43,13 +43,7 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const { user } = useApp();
   const [activeTab, setActiveTab] = useState<FSType>("balance_sheet");
-  const [statements, setStatements] = useState<Record<FSType, FinancialStatement | null>>({
-    balance_sheet: null,
-    profit_loss: null,
-    cash_flow: null,
-    equity_changes: null,
-    audit_report: null,
-  });
+  const [statements, setStatements] = useState<Partial<Record<FSType, FinancialStatement>>>({});
   const [loading, setLoading] = useState(true);
   const [drafting, setDrafting] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -57,18 +51,20 @@ export default function EditorPage() {
   const loadStatements = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    try {
-      for (const tab of FS_TABS) {
+    const results: Partial<Record<FSType, FinancialStatement>> = {};
+    await Promise.all(
+      FS_TABS.map(async (tab) => {
         try {
-          const data = await api.get(`/projects/${projectId}/draft/${tab.type}`, authHeader(user.token));
-          setStatements((prev) => ({ ...prev, [tab.type]: data }));
+          // Backend: GET /projects/{id}/fs/{fs_type}
+          const data = await api.get(`/projects/${projectId}/fs/${tab.type}`, authHeader(user.token));
+          results[tab.type] = data;
         } catch {
-          // not generated yet
+          // not generated yet — skip
         }
-      }
-    } finally {
-      setLoading(false);
-    }
+      })
+    );
+    setStatements(results);
+    setLoading(false);
   }, [user, projectId]);
 
   useEffect(() => { loadStatements(); }, [loadStatements]);
@@ -77,7 +73,8 @@ export default function EditorPage() {
     if (!user) return;
     setDrafting(true);
     try {
-      await api.post(`/projects/${projectId}/draft/run`, {}, authHeader(user.token));
+      // Backend: POST /projects/{id}/draft
+      await api.post(`/projects/${projectId}/draft`, {}, authHeader(user.token));
       toast.success("Draft งบการเงินสำเร็จ");
       await loadStatements();
     } catch (err: unknown) {
@@ -91,7 +88,8 @@ export default function EditorPage() {
     if (!user) return;
     setFinalizing(true);
     try {
-      await api.post(`/projects/${projectId}/draft/finalize`, {}, authHeader(user.token));
+      // Backend: POST /projects/{id}/fs/{fs_type}/finalize (finalize all via balance_sheet)
+      await api.post(`/projects/${projectId}/fs/balance_sheet/finalize`, {}, authHeader(user.token));
       toast.success("Finalize งบการเงินสำเร็จ");
       await loadStatements();
     } catch (err: unknown) {
@@ -104,6 +102,7 @@ export default function EditorPage() {
   const current = statements[activeTab];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = current?.data as any;
+  const hasAny = Object.keys(statements).length > 0;
 
   return (
     <AuthGuard>
@@ -119,38 +118,26 @@ export default function EditorPage() {
             )}
           </div>
           <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={runDraft}
-              disabled={drafting}
-              className="border border-blue-600 text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition"
-            >
-              {drafting ? "กำลัง draft..." : "Re-Draft"}
+            <button type="button" onClick={runDraft} disabled={drafting}
+              className="border border-blue-600 text-blue-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition">
+              {drafting ? "กำลัง draft..." : hasAny ? "Re-Draft" : "Draft งบการเงิน"}
             </button>
-            <button
-              type="button"
-              onClick={finalize}
-              disabled={finalizing || !current}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
-            >
-              {finalizing ? "กำลัง finalize..." : "Finalize งบ"}
-            </button>
+            {hasAny && (
+              <button type="button" onClick={finalize} disabled={finalizing}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition">
+                {finalizing ? "กำลัง finalize..." : "Finalize งบ"}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b mb-6 gap-1">
           {FS_TABS.map((tab) => (
-            <button
-              key={tab.type}
-              type="button"
-              onClick={() => setActiveTab(tab.type)}
+            <button key={tab.type} type="button" onClick={() => setActiveTab(tab.type)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
-                activeTab === tab.type
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
+                activeTab === tab.type ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}>
               {tab.label}
             </button>
           ))}
@@ -160,15 +147,7 @@ export default function EditorPage() {
           <div className="text-center py-16 text-gray-400">กำลังโหลด...</div>
         ) : !current ? (
           <div className="text-center py-16 border-2 border-dashed rounded-xl">
-            <p className="text-gray-400 mb-4">ยังไม่มีข้อมูลงบนี้</p>
-            <button
-              type="button"
-              onClick={runDraft}
-              disabled={drafting}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
-            >
-              {drafting ? "กำลัง draft..." : "Draft งบการเงิน"}
-            </button>
+            <p className="text-gray-400 mb-4">ยังไม่มีข้อมูลงบนี้ — กด Draft งบการเงินก่อน</p>
           </div>
         ) : (
           <div className="bg-white border rounded-xl p-6">

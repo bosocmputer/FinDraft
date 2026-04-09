@@ -64,15 +64,16 @@ export default function MappingPage() {
     }
   }
 
-  async function updateCategory(mappingId: string, category: Category) {
+  async function updateCategory(accountCode: string, category: Category) {
     if (!user) return;
     try {
+      // Backend: PUT /projects/{id}/mapping/{account_code}
       await api.put(
-        `/projects/${projectId}/mapping/${mappingId}`,
+        `/projects/${projectId}/mapping/${accountCode}`,
         { category },
         authHeader(user.token)
       );
-      setMappings((prev) => prev.map((m) => (m.id === mappingId ? { ...m, category } : m)));
+      setMappings((prev) => prev.map((m) => (m.account_code === accountCode ? { ...m, category } : m)));
     } catch {
       toast.error("อัปเดต category ไม่สำเร็จ");
     }
@@ -156,7 +157,7 @@ export default function MappingPage() {
                     <td className="px-4 py-3">
                       <select
                         value={m.category}
-                        onChange={(e) => updateCategory(m.id, e.target.value as Category)}
+                        onChange={(e) => updateCategory(m.account_code, e.target.value as Category)}
                         aria-label={`Category สำหรับ ${m.account_code}`}
                         title={`Category สำหรับ ${m.account_code}`}
                         className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
