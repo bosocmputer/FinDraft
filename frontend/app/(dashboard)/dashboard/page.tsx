@@ -42,8 +42,10 @@ export default function DashboardPage() {
       if (!org && data.length > 0) {
         setOrg({ org_id: data[0].id, org_name: data[0].name, role: "admin" });
       }
-    } catch {
-      toast.error("โหลดข้อมูลองค์กรไม่สำเร็จ");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "โหลดข้อมูลองค์กรไม่สำเร็จ");
+    } finally {
+      setLoading(false);
     }
   }, [user, org, setOrg]);
 

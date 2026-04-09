@@ -38,7 +38,18 @@ async def list_orgs(current_user: dict = Depends(get_current_user)):
         .eq("user_id", current_user["id"])
         .execute()
     )
-    return result.data or []
+    # Flatten nested structure: { organizations: {id, name} } → {id, name, role}
+    orgs = []
+    for row in (result.data or []):
+        org = row.get("organizations") or {}
+        if org:
+            orgs.append({
+                "id": org["id"],
+                "name": org["name"],
+                "created_at": org.get("created_at"),
+                "role": row["role"],
+            })
+    return orgs
 
 
 @router.post("")

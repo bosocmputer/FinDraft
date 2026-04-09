@@ -6,6 +6,14 @@ from database import supabase
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 
+def _decode_token(token: str) -> dict:
+    import time
+    payload = jwt.decode(token, options={"verify_signature": False})
+    if payload.get("exp", 0) < time.time():
+        raise HTTPException(401, "Token expired")
+    return payload
+
+
 async def get_current_user(authorization: str = Header(...)) -> dict:
     """
     Decode Supabase JWT token และ return user dict
@@ -17,20 +25,12 @@ async def get_current_user(authorization: str = Header(...)) -> dict:
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
-        # Decode JWT โดยไม่ verify signature (Supabase ใช้ ES256 ซึ่งต้องใช้ public key)
-        # แต่ verify กับ Supabase Auth API แทน
-        payload = jwt.decode(token, options={"verify_signature": False})
-
+        payload = _decode_token(token)
         user_id = payload.get("sub")
         email = payload.get("email")
 
         if not user_id:
             raise HTTPException(401, "Invalid token")
-
-        # ตรวจ expiry
-        import time
-        if payload.get("exp", 0) < time.time():
-            raise HTTPException(401, "Token expired")
 
         return {"id": user_id, "email": email}
 

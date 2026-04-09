@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from database import supabase
 
@@ -7,8 +7,7 @@ router = APIRouter()
 
 class RegisterRequest(BaseModel):
     email: str
-    password: str
-    name: str
+    org_name: str
 
 
 class LoginRequest(BaseModel):
@@ -17,30 +16,48 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/register")
-async def register(body: RegisterRequest):
+async def register(body: RegisterRequest, authorization: str = Header(None)):
+    """
+    Called after Supabase Auth signup — creates user profile + org.
+    Requires Bearer token from Supabase session (passed by frontend).
+    """
+    from dependencies import _decode_token
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+
+    if not token:
+        raise HTTPException(401, "Authorization token required")
+
+    payload = _decode_token(token)
+    user_id = payload.get("sub")
+    email = payload.get("email", body.email)
+
+    if not user_id:
+        raise HTTPException(401, "Invalid token")
+
     try:
-        # สร้าง user ใน Supabase Auth
-        auth_resp = supabase.auth.sign_up({
-            "email": body.email,
-            "password": body.password,
-        })
-        if not auth_resp.user:
-            raise HTTPException(400, "Registration failed")
-
-        user_id = auth_resp.user.id
-
-        # Insert ลง users table
+        # Upsert user profile
         supabase.table("users").upsert({
             "id": user_id,
-            "email": body.email,
-            "name": body.name,
+            "email": email,
+            "name": email.split("@")[0],
         }).execute()
 
-        return {
+        # สร้าง org ใหม่
+        org = supabase.table("organizations").insert({"name": body.org_name}).execute()
+        if not org.data:
+            raise HTTPException(500, "Failed to create organization")
+        org_id = org.data[0]["id"]
+
+        # Add user เป็น admin ของ org
+        supabase.table("user_organizations").insert({
             "user_id": user_id,
-            "email": body.email,
-            "access_token": auth_resp.session.access_token if auth_resp.session else None,
-        }
+            "org_id": org_id,
+            "role": "admin",
+        }).execute()
+
+        return {"user_id": user_id, "org_id": org_id, "org_name": body.org_name}
     except HTTPException:
         raise
     except Exception as e:
